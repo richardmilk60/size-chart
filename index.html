@@ -164,7 +164,10 @@ function renderPenis(canvas,imgs,lenMm,girMm,gr,gav){
   var h=imgs.head,sc=imgs.shaftCap,sh=imgs.shaft;
   var px=PX_PER_MM,diam=girMm/Math.PI;
   var lenPx=lenMm*px, shW=diam*px;
-  var hW=shW*gr, hH=hW*(h.height/h.width)*gr*gav;
+  var hW=shW*gr;
+  // Glans height: formula gives gr² scaling which under-sizes heads on long shafts.
+  // Floor at 20% of total length (matches ruler-photo evidence for 7-8" penises).
+  var hH=Math.max(hW*(h.height/h.width)*gr*gav, lenPx*0.20);
   var capH=shW*(sc.height/sc.width);
   var hOverlap=Math.ceil(hH*0.6);
   var hBot=hH-hOverlap, capBot=hBot+capH-1;
