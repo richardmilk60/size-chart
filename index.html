@@ -78,7 +78,7 @@ var IN2MM     = 25.4;
 var PX_PER_MM = 46 / 25.4;
 
 var PEOPLE = [
-  {id:'brian',name:'Brian', le:3.25,ls:1.20,ge:2.0, gs:1.40,type:'subject' },
+  {id:'brian',name:'Brian', le:3.25,ls:1.20,ge:2.3, gs:1.40,type:'subject' },
   {id:'host', name:'Host',  le:8.50,ls:4.80,ge:6.25,gs:4.20,type:'host'    },
   {id:'d1',   name:'Dad 1', le:7.50,ls:4.20,ge:5.50,gs:3.80,type:'familiar'},
   {id:'d2',   name:'Dad 2', le:7.70,ls:4.30,ge:5.70,gs:3.90,type:'familiar'},
@@ -121,17 +121,16 @@ function seededRand(seed){
   return function(){s=((Math.imul(s,1664525)+1013904223)&0xffffffff)>>>0;return s/4294967295;};
 }
 
-// Glans scaling — medically calibrated.
-// Prepubertal: shaft is underdeveloped, glans is wider than shaft and ~35-40% of total length.
-// Puberty: shaft elongates rapidly, glans grows slowly — ratio falls.
-// Adult: glans ~90-92% of shaft width, ~25-28% of total length.
-//   gr=1.20 @ 1.5" (age 7) → gr=0.90 @ 5.2" (adult)
-//   Glans wider than shaft (gr>1) through early teens (~4" / age 13).
+// Glans ratio — calibrated against photo evidence.
+// Shaft contracts more than glans when soft, so small/soft = very mushroom-heavy.
+// Soft Brian (1.2"): glans ~1.55x shaft. Erect Brian (3.25"): glans ~1.27x shaft.
+// Adult large dads (6"+): glans ~0.90x shaft (clamped floor).
+// Linear: 1.696 - lenIn*0.1327, clamped to [0.90, 1.55].
 function glansRatio(lenIn, id){
-  var base=Math.max(0.88,Math.min(1.22, 1.322-lenIn*0.081));
+  var base=Math.max(0.90,Math.min(1.55, 1.696-lenIn*0.1327));
   if(!id||id==='brian'||id.startsWith('age_'))return base;
   var rng=seededRand(hashStr(id));rng();rng();
-  return Math.max(0.78,Math.min(1.30, base+(rng()-0.5)*0.16));
+  return Math.max(0.80,Math.min(1.65, base+(rng()-0.5)*0.20));
 }
 
 // Glans height aspect variation (taller vs flatter corona) per person
