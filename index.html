@@ -256,9 +256,8 @@ async function buildChart(cid,entries,gen,t){
     var ns='color:'+typeColor(e.type)+(e.isBrian?';border-bottom:1px dashed #c84040':'');
 
     if(e.isBrian){
-      // "▼ YOU" marker makes Brian's column easy to find
       lc.innerHTML=
-        '<span style="display:block;color:#c84040;font-size:8px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px;">&#9660; YOU</span>'+
+        '<span style="display:block;color:#c84040;font-size:9px;margin-bottom:2px;">&#9660;</span>'+
         '<span class="p-name" style="'+ns+'">'+e.name+'</span>'+
         '<span class="p-meas">'+lIn+'" x '+gIn+'"</span>';
     } else {
