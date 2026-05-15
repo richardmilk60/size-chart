@@ -194,44 +194,120 @@ const DEV = [
 ];
 
 // ─── REALISTIC SHAPE RENDERER ────────────────────────────────────────────────
-// Builds SVG markup for a circumcised white male at given dimensions.
-// Returns inner SVG elements (no outer <svg> tag — caller provides that).
+
+function seededRand(seed) {
+  let s = ((seed ^ 0x12345678) >>> 0) || 1;
+  return function() { s^=s<<13; s^=s>>17; s^=s<<5; return (s>>>0)/0xffffffff; };
+}
+function idSeed(id) {
+  let h=5381; for(let i=0;i<id.length;i++) h=((h*33)^id.charCodeAt(i))&0xffffff; return h||1;
+}
+
+// Generic hair strand generator. origins(rng,i) → [x,y], opts.angle(rng) → angle in radians
+function buildHairStrands(rng, count, origins, opts) {
+  let out='';
+  for(let i=0;i<count;i++){
+    const [x0,y0]=origins(rng,i);
+    const ga=opts.angle(rng);
+    const len=opts.lenMin+rng()*opts.lenRange;
+    const cx1=x0+Math.sin(ga)*len*.45+(rng()-.5)*opts.curl;
+    const cy1=y0+Math.cos(ga)*len*.45+(rng()-.5)*opts.curl*.35;
+    const x2 =x0+Math.sin(ga)*len+(rng()-.5)*opts.curl*.4;
+    const y2 =y0+Math.cos(ga)*len;
+    out+=`<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} Q${cx1.toFixed(1)} ${cy1.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${opts.color}" stroke-width="${(opts.wMin+rng()*opts.wRange).toFixed(2)}" opacity="${(opts.opMin+rng()*opts.opRange).toFixed(2)}" stroke-linecap="round"/>`;
+  }
+  return out;
+}
+
+function buildBalls(id, cx, baseY, sr, smooth) {
+  const bR = Math.min(sr*1.38, 52);
+  const lx = cx-bR*.50, ly = baseY+bR*1.32;
+  const rx = cx+bR*.46, ry = baseY+bR*.97;
+  const ts = (idSeed(id)*3+17)%99+1;
+  let out=`
+    <defs>
+      <radialGradient id="blg_${id}" cx="36%" cy="30%" r="65%">
+        <stop offset="0%"   stop-color="#d49060"/>
+        <stop offset="40%"  stop-color="#a86030"/>
+        <stop offset="100%" stop-color="#6e3510"/>
+      </radialGradient>
+      <radialGradient id="brg_${id}" cx="38%" cy="28%" r="62%">
+        <stop offset="0%"   stop-color="#c88858"/>
+        <stop offset="40%"  stop-color="#9c5a28"/>
+        <stop offset="100%" stop-color="#683210"/>
+      </radialGradient>
+      <filter id="btx_${id}" color-interpolation-filters="sRGB" x="-15%" y="-15%" width="130%" height="130%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.58 0.40" numOctaves="3" seed="${ts}" result="n"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0 0.02  0 0 0 0.26 0" in="n" result="t"/>
+        <feComposite in="t" in2="SourceGraphic" operator="in" result="m"/>
+        <feBlend in="SourceGraphic" in2="m" mode="multiply"/>
+      </filter>
+    </defs>
+    <g filter="url(#btx_${id})">
+      <ellipse cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" rx="${(bR*.94).toFixed(1)}" ry="${(bR*.99).toFixed(1)}" fill="url(#blg_${id})" stroke="#5e2c0e" stroke-width="0.8"/>
+      <ellipse cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}"  rx="${(bR*.88).toFixed(1)}" ry="${(bR*.93).toFixed(1)}" fill="url(#brg_${id})" stroke="#5e2c0e" stroke-width="0.8"/>
+    </g>
+    <path d="M${cx.toFixed(1)} ${(baseY+bR*.10).toFixed(1)} Q${(cx+bR*.05).toFixed(1)} ${(baseY+bR*.95).toFixed(1)} ${(cx+bR*.06).toFixed(1)} ${(baseY+bR*2.08).toFixed(1)}" fill="none" stroke="rgba(50,18,6,.42)" stroke-width="1.1" stroke-linecap="round"/>
+  `;
+  if(!smooth){
+    const br1=seededRand(idSeed(id)*5+11);
+    out+=buildHairStrands(br1,16,
+      (r)=>[lx+(r()-.5)*bR*1.7, ly+(r()-.5)*bR*1.7],
+      {angle:r=>r()*Math.PI*2,lenMin:4,lenRange:8,curl:4,color:'#1c0a04',wMin:.60,wRange:.70,opMin:.50,opRange:.38});
+    const br2=seededRand(idSeed(id)*7+23);
+    out+=buildHairStrands(br2,13,
+      (r)=>[rx+(r()-.5)*bR*1.5, ry+(r()-.5)*bR*1.5],
+      {angle:r=>r()*Math.PI*2,lenMin:3,lenRange:7,curl:4,color:'#1c0a04',wMin:.55,wRange:.65,opMin:.48,opRange:.38});
+  }
+  return out;
+}
+
+function buildVeins(rng, cx, coronaY, baseY, sr) {
+  const sH=baseY-coronaY; let v='';
+  const offsets=[sr*.22,-sr*.16,sr*.05];
+  for(let i=0;i<3;i++){
+    const xo=cx+offsets[i];
+    const y0=coronaY+sH*(0.06+rng()*.12), y3=coronaY+sH*(0.58+rng()*.30), dl=y3-y0;
+    v+=`<path d="M${xo.toFixed(1)} ${y0.toFixed(1)} C${(xo+(rng()-.5)*sr*.4).toFixed(1)} ${(y0+dl*.33).toFixed(1)} ${(xo+(rng()-.5)*sr*.4).toFixed(1)} ${(y0+dl*.66).toFixed(1)} ${(xo+(rng()-.5)*sr*.25).toFixed(1)} ${y3.toFixed(1)}" fill="none" stroke="rgba(75,25,10,.20)" stroke-width="${(.85+rng()*.5).toFixed(2)}" stroke-linecap="round"/>`;
+  }
+  return v;
+}
 
 function buildShape(id, cx, baseY, lengthPx, diamPx) {
-  const sr  = diamPx / 2;
-  const gr  = sr * 1.44;               // pronounced corona flare (TheVisualiser style)
-  const gH  = lengthPx * 0.23;         // glans height — compact mushroom cap
-  const sH  = lengthPx - gH;
-  const sbr = sr * 1.06;
-
+  const smooth  = (id === 'brian');
+  const rng     = seededRand(idSeed(id));
+  const sr      = diamPx / 2;
+  const gr      = sr * 1.44;
+  const gH      = lengthPx * 0.23;
+  const sH      = lengthPx - gH;
+  const sbr     = sr * 1.06;
   const coronaY = baseY - sH;
   const tipY    = baseY - lengthPx;
   const scarY   = coronaY + sH * 0.22;
   const mRx     = Math.max(2.0, gr * 0.12);
   const mRy     = Math.max(1.1, mRx * 0.40);
+  const texSeed = idSeed(id) % 97 + 1;
 
   const shaftP = [
-    `M ${cx-sbr} ${baseY}`,
-    `L ${cx-sr}  ${coronaY}`,
-    `L ${cx+sr}  ${coronaY}`,
-    `L ${cx+sbr} ${baseY}`,
-    `Z`
+    `M ${cx-sbr} ${baseY}`,`L ${cx-sr}  ${coronaY}`,
+    `L ${cx+sr}  ${coronaY}`,`L ${cx+sbr} ${baseY}`,`Z`
   ].join(' ');
 
-  // Glans: rapid flare to corona width, then dome narrows to tip
   const glansP = [
     `M ${cx-sr}  ${coronaY}`,
     `C ${cx-sr*1.05} ${coronaY-gH*.04} ${cx-gr} ${coronaY-gH*.17} ${cx-gr} ${coronaY-gH*.30}`,
     `C ${cx-gr}  ${coronaY-gH*.62} ${cx-gr*.32} ${tipY+gH*.05} ${cx} ${tipY}`,
     `C ${cx+gr*.32} ${tipY+gH*.05} ${cx+gr} ${coronaY-gH*.62} ${cx+gr} ${coronaY-gH*.30}`,
-    `C ${cx+gr}  ${coronaY-gH*.17} ${cx+sr*1.05} ${coronaY-gH*.04} ${cx+sr} ${coronaY}`,
-    `Z`
+    `C ${cx+gr}  ${coronaY-gH*.17} ${cx+sr*1.05} ${coronaY-gH*.04} ${cx+sr} ${coronaY}`,`Z`
   ].join(' ');
 
-  // Prominent corona groove
-  const grooveP = `M ${cx-gr*.90} ${coronaY+gH*.09} Q ${cx} ${coronaY+gH*.18} ${cx+gr*.90} ${coronaY+gH*.09}`;
-
+  const grooveP  = `M ${cx-gr*.90} ${coronaY+gH*.09} Q ${cx} ${coronaY+gH*.18} ${cx+gr*.90} ${coronaY+gH*.09}`;
   const midlineP = `M ${cx} ${coronaY} L ${cx} ${baseY}`;
+
+  const pubicHair = smooth ? '' : buildHairStrands(seededRand(idSeed(id)+99), 58,
+    (r)=>{ const sp=(r()-.5)*sr*2.9; return [cx+sp, baseY+r()*sr*.45]; },
+    {angle:r=>(r()-.5)*2.3, lenMin:9,lenRange:18,curl:7,
+     color:'#1c0a04',wMin:.55,wRange:.85,opMin:.48,opRange:.44});
 
   return `
     <defs>
@@ -257,14 +333,27 @@ function buildShape(id, cx, baseY, lengthPx, diamPx) {
         <stop offset="0%"   stop-color="rgba(255,235,210,.40)"/>
         <stop offset="100%" stop-color="rgba(255,210,180,0)"/>
       </radialGradient>
+      <filter id="tex_${id}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.48 0.26" numOctaves="4" seed="${texSeed}" result="noise"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 0.10  0 0 0 0 0.05  0 0 0 0 0.02  0 0 0 0.22 0" in="noise" result="tinted"/>
+        <feComposite in="tinted" in2="SourceGraphic" operator="in" result="masked"/>
+        <feBlend in="SourceGraphic" in2="masked" mode="multiply"/>
+      </filter>
     </defs>
-    <path d="${shaftP}" fill="url(#sh_${id})" stroke="#5a2810" stroke-width="0.7" stroke-linejoin="round"/>
-    <path d="${shaftP}" fill="url(#hl_${id})" stroke="none"/>
+    ${buildBalls(id, cx, baseY, sr, smooth)}
+    ${pubicHair}
+    <g filter="url(#tex_${id})">
+      <path d="${shaftP}" fill="url(#sh_${id})" stroke="#5a2810" stroke-width="0.7" stroke-linejoin="round"/>
+      <path d="${shaftP}" fill="url(#hl_${id})" stroke="none"/>
+    </g>
+    ${buildVeins(rng, cx, coronaY, baseY, sr)}
     <path d="${midlineP}" fill="none" stroke="rgba(55,18,8,.14)" stroke-width="1.0"/>
     <line x1="${cx-sr*.93}" y1="${scarY}" x2="${cx+sr*.93}" y2="${scarY}"
       stroke="rgba(60,18,8,.32)" stroke-width="1.3"/>
-    <path d="${glansP}" fill="url(#gl_${id})" stroke="#4a1a0e" stroke-width="0.7"/>
-    <path d="${glansP}" fill="url(#hl_${id})" stroke="none"/>
+    <g filter="url(#tex_${id})">
+      <path d="${glansP}" fill="url(#gl_${id})" stroke="#4a1a0e" stroke-width="0.7"/>
+      <path d="${glansP}" fill="url(#hl_${id})" stroke="none"/>
+    </g>
     <path d="${grooveP}" fill="none" stroke="rgba(28,8,3,.72)" stroke-width="3.0" stroke-linecap="round"/>
     <ellipse cx="${cx}" cy="${tipY+mRy*2.4}" rx="${mRx}" ry="${mRy}"
       fill="#1a0804" opacity=".55"/>
@@ -273,10 +362,13 @@ function buildShape(id, cx, baseY, lengthPx, diamPx) {
 
 // Full <svg> element for a person at given t (0=soft, 1=erect)
 function personSVG(person, t, svgW, svgH, sc) {
-  const l = lerp(person.ls, person.le, t);
-  const g = lerp(person.gs, person.ge, t);
-  const cx = svgW / 2;
-  const baseY = svgH - 10;
+  const l    = lerp(person.ls, person.le, t);
+  const g    = lerp(person.gs, person.ge, t);
+  const cx   = svgW / 2;
+  const sr   = (g / Math.PI / 2) * sc;
+  const bR   = Math.min(sr * 1.38, 52);
+  const ballBottom = bR * 1.32 + bR * 0.99 + 6;
+  const baseY = svgH - Math.ceil(ballBottom) - 4;
   const lenPx = l * sc;
   const diaP  = (g / Math.PI) * sc;
   const inner = buildShape(person.id, cx, baseY, lenPx, diaP);
@@ -304,10 +396,17 @@ function renderGroup(){
   const RULER_W = 50;
   const COL_W   = 112;
   const PAD_T   = 20;
-  const PAD_B   = 46;
   const maxLen  = PEOPLE.reduce((m,p)=>Math.max(m,lerp(p.ls,p.le,1)),0);
   const maxH_px = Math.ceil(maxLen * SCALE) + PAD_T;
   const baseY   = maxH_px;
+  // Calculate max ball extent across all people (erect girth drives ball size)
+  const maxBallBottom = PEOPLE.reduce((m,p)=>{
+    const g=lerp(p.gs,p.ge,1); const sr=(g/Math.PI/2)*SCALE;
+    const bR=Math.min(sr*1.38,52);
+    return Math.max(m, bR*1.32+bR*0.99);
+  },0);
+  const LABEL_OFF = maxBallBottom + 14;
+  const PAD_B   = maxBallBottom + 46;
   const totalH  = maxH_px + PAD_B;
   const totalW  = RULER_W + sorted.length * COL_W + 14;
   const maxInch = Math.ceil(maxLen) + 1;
@@ -340,8 +439,8 @@ function renderGroup(){
     const diaPx = (g/Math.PI) * SCALE;
     shapes += buildShape(p.id, cx, baseY, lenPx, diaPx);
     const col = typeColorHex(p.type);
-    shapes += `<text x="${cx}" y="${baseY+16}" text-anchor="middle" fill="${col}" font-size="9.5" font-family="monospace" font-weight="bold" letter-spacing=".05em">${p.name}</text>`;
-    shapes += `<text x="${cx}" y="${baseY+28}" text-anchor="middle" fill="#999" font-size="8.5" font-family="monospace">${l.toFixed(2)}" × ${g.toFixed(2)}"</text>`;
+    shapes += `<text x="${cx}" y="${baseY+LABEL_OFF}" text-anchor="middle" fill="${col}" font-size="9.5" font-family="monospace" font-weight="bold" letter-spacing=".05em">${p.name}</text>`;
+    shapes += `<text x="${cx}" y="${baseY+LABEL_OFF+13}" text-anchor="middle" fill="#999" font-size="8.5" font-family="monospace">${l.toFixed(2)}" × ${g.toFixed(2)}"</text>`;
   });
 
   const svg = `<svg width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
@@ -448,7 +547,7 @@ function renderDevPanel(){
   const brian=PEOPLE.find(p=>p.id==='brian');
   const state=t>.5?'Erect':'Soft';
 
-  const maxDevH=Math.ceil(TYPICAL_ADULT.le*DSCALE)+20;
+  const maxDevH=Math.ceil(TYPICAL_ADULT.le*DSCALE)+120;
   const bSvg=personSVG(brian,t,80,maxDevH,DSCALE);
   const tSvg=personSVG(TYPICAL_ADULT,t,80,maxDevH,DSCALE);
 
