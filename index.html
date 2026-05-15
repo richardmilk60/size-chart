@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Size Comparison Visualizer</title>
+<style>
+:root {
+  --bg:       #090d12;
+  --surface:  #0f1822;
+  --border:   #1c2a38;
+  --text:     #7a95ae;
+  --bright:   #bdd0e0;
+  --accent:   #2563a8;
+  --c-brian:  #c84040;
+  --c-host:   #c8a030;
+  --c-fam:    #2e6db0;
+  --c-new:    #2e8a58;
+  --c-shape:  #c0cdd8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', 'SF Mono', monospace;
+  font-size: 12px;
+  min-height: 100vh;
+}
+header {
+  padding: 18px 28px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+}
+header h1 {
+  font-size: 13px;
+  font-weight: normal;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--bright);
+}
+header .sub {
+  font-size: 10px;
+  opacity: .45;
+  letter-spacing: .06em;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+}
+.tab {
+  padding: 11px 20px;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .2s, border-color .2s;
+  user-select: none;
+}
+.tab.active  { color: var(--bright); border-bottom-color: var(--accent); }
+.tab:hover:not(.active) { color: var(--bright); }
+.pane { display: none; padding: 28px; }
+.pane.active { display: block; }
+
+/* ── Slider row ── */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.sl-lbl {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  min-width: 40px;
+}
+.sl-lbl.l { text-align: right; }
+.state-btn {
+  padding: 4px 13px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.state-btn:hover, .state-btn.on {
+  border-color: var(--accent);
+  color: var(--bright);
+}
+input[type=range] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* ── Group shapes ── */
+.shapes-scroll { overflow-x: auto; padding-bottom: 6px; }
+.shapes-row { display: flex; align-items: flex-end; min-width: max-content; }
+.s-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 108px;
+  padding: 0 4px;
+}
+.s-svg-wrap { height: 430px; display: flex; align-items: flex-end; justify-content: center; }
+.s-lbl {
+  text-align: center;
+  margin-top: 10px;
+  line-height: 1.55;
+}
+.s-lbl .nm {
+  display: block;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.s-lbl .ms {
+  display: block;
+  font-size: 9px;
+  opacity: .6;
+  margin-top: 2px;
+}
+
+/* ── Stats panel ── */
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 10px; margin-top: 28px; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 13px 16px;
+}
+.stat-card .lbl { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; opacity: .5; margin-bottom: 7px; }
+.stat-card .val { font-size: 20px; color: var(--bright); }
+.stat-card .sub { font-size: 10px; opacity: .4; margin-top: 3px; }
+
+/* ── Dev layout ── */
+.dev-grid { display: grid; grid-template-columns: 1fr 270px; gap: 26px; }
+@media (max-width: 760px) { .dev-grid { grid-template-columns: 1fr; } }
+.dev-chart-wrap { background: var(--surface); border: 1px solid var(--border); }
+.chart-note { font-size: 10px; opacity: .45; margin-top: 10px; line-height: 1.65; }
+.side-panel { display: flex; flex-direction: column; gap: 14px; }
+.inset {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+.inset h3 {
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: 14px;
+}
+.dev-shapes-row { display: flex; align-items: flex-end; justify-content: center; gap: 28px; height: 210px; }
+.mini-lbl { text-align: center; margin-top: 8px; font-size: 10px; line-height: 1.5; }
+
+/* ── Legend ── */
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+.leg-item { display: flex; align-items: center; gap: 7px; font-size: 10px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Base bar ── */
+.base-bar { width: 60px; height: 3px; background: var(--border); border-radius: 1px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Size Comparison Visualizer</h1>
+  <span class="sub">Clinical Reference — Personal Use</span>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" onclick="switchTab('dev')">Developmental Chart</div>
+  <div class="tab" onclick="switchTab('grp')">Group Comparison</div>
+</nav>
+
+<!-- ─── DEVELOPMENTAL ─────────────────────────────────────────────────────── -->
+<div id="pane-dev" class="pane active">
+
+  <div class="slider-row">
+    <span class="sl-lbl l">SOFT</span>
+    <button class="state-btn" id="dev-soft-btn" onclick="animSlider('dev-sl',0)">Soft</button>
+    <input type="range" id="dev-sl" min="0" max="100" value="100" oninput="renderAll()">
+    <button class="state-btn on" id="dev-erect-btn" onclick="animSlider('dev-sl',100)">Erect</button>
+    <span class="sl-lbl">ERECT</span>
+  </div>
+
+  <div class="dev-grid">
+    <div>
+      <div class="dev-chart-wrap">
+        <svg id="dev-svg" width="100%" viewBox="0 0 620 390" style="display:block;"></svg>
+      </div>
+      <p class="chart-note">
+        Shaded bands show typical erect length development by age (P10–P90 outer, P25–P75 inner, P50 median).
+        Brian's marker reflects the selected state. Developmental percentiles are for erect measurement;
+        soft comparison is shown for reference only.
+      </p>
+    </div>
+    <div class="side-panel">
+      <div class="inset">
+        <h3>Brian vs. Typical Adult (P50)</h3>
+        <div class="dev-shapes-row" id="dev-compare"></div>
+        <div class="legend">
+          <div class="leg-item"><div class="leg-dot" style="background:var(--c-brian)"></div><span>Brian</span></div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--c-shape)"></div><span>Typical Adult</span></div>
+        </div>
+      </div>
+      <div class="inset" id="dev-stats"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── GROUP ─────────────────────────────────────────────────────────────── -->
+<div id="pane-grp" class="pane">
+
+  <div class="slider-row">
+    <span class="sl-lbl l">SOFT</span>
+    <button class="state-btn" id="grp-soft-btn" onclick="animSlider('grp-sl',0)">Soft</button>
+    <input type="range" id="grp-sl" min="0" max="100" value="100" oninput="renderAll()">
+    <button class="state-btn on" id="grp-erect-btn" onclick="animSlider('grp-sl',100)">Erect</button>
+    <span class="sl-lbl">ERECT</span>
+  </div>
+
+  <div class="shapes-scroll">
+    <div class="shapes-row" id="grp-row"></div>
+  </div>
+
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--c-brian)"></div><span>Brian</span></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--c-host)"></div><span>Host</span></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--c-fam)"></div><span>Familiar Dads</span></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--c-new)"></div><span>Newer Connections</span></div>
+  </div>
+
+  <div class="stats" id="grp-stats"></div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const SCALE = 46; // px per inch (group view)
+const DSCALE = 32; // px per inch (dev comparison panel)
+
+const PEOPLE = [
+  // id, name, erect", soft", girthErect", girthSoft", type
+  { id:'brian', name:'Brian',  le:3.25, ls:1.20, ge:3.50, gs:2.90, type:'subject'  },
+  { id:'host',  name:'Host',   le:8.00, ls:4.50, ge:6.25, gs:4.20, type:'host'     },
+  { id:'d1',    name:'Dad 1',  le:7.50, ls:4.20, ge:5.50, gs:3.80, type:'familiar' },
+  { id:'d2',    name:'Dad 2',  le:7.70, ls:4.30, ge:5.70, gs:3.90, type:'familiar' },
+  { id:'d3',    name:'Dad 3',  le:7.80, ls:4.35, ge:5.80, gs:3.95, type:'familiar' },
+  { id:'d4',    name:'Dad 4',  le:7.90, ls:4.40, ge:5.90, gs:4.00, type:'familiar' },
+  { id:'d5',    name:'Dad 5',  le:8.10, ls:4.55, ge:6.00, gs:4.10, type:'newer'    },
+  { id:'d6',    name:'Dad 6',  le:8.20, ls:4.60, ge:6.30, gs:4.20, type:'newer'    },
+  { id:'d7',    name:'Dad 7',  le:8.30, ls:4.65, ge:6.50, gs:4.30, type:'newer'    },
+  { id:'d8',    name:'Dad 8',  le:8.50, ls:4.75, ge:6.75, gs:4.40, type:'newer'    },
+];
+
+const TYPICAL_ADULT = { id:'typ', name:'Typical\nAdult', le:5.20, ls:3.00, ge:4.59, gs:3.40, type:'typical' };
+
+// Erect length percentiles by age (approximate clinical reference)
+const DEV = [
+  { age:7,  p10:1.1, p25:1.3, p50:1.5, p75:1.8, p90:2.1 },
+  { age:8,  p10:1.2, p25:1.4, p50:1.7, p75:2.0, p90:2.3 },
+  { age:9,  p10:1.3, p25:1.6, p50:1.9, p75:2.3, p90:2.6 },
+  { age:10, p10:1.5, p25:1.8, p50:2.2, p75:2.6, p90:3.0 },
+  { age:11, p10:1.8, p25:2.2, p50:2.7, p75:3.2, p90:3.6 },
+  { age:12, p10:2.3, p25:2.8, p50:3.3, p75:3.9, p90:4.3 },
+  { age:13, p10:3.0, p25:3.5, p50:4.1, p75:4.7, p90:5.1 },
+  { age:14, p10:3.6, p25:4.1, p50:4.7, p75:5.2, p90:5.6 },
+  { age:15, p10:3.9, p25:4.4, p50:5.0, p75:5.5, p90:5.9 },
+  { age:16, p10:4.1, p25:4.6, p50:5.1, p75:5.7, p90:6.1 },
+  { age:17, p10:4.3, p25:4.8, p50:5.2, p75:5.8, p90:6.2 },
+  { age:18, p10:4.4, p25:4.9, p50:5.2, p75:5.8, p90:6.3 },
+  { age:20, p10:4.5, p25:5.0, p50:5.2, p75:5.8, p90:6.4 },
+];
+
+// ─── SHAPE ───────────────────────────────────────────────────────────────────
+
+function penisPath(cx, baseY, lenIn, girthIn, sc) {
+  const L  = lenIn * sc;
+  const D  = (girthIn / Math.PI) * sc;
+  const sr = D / 2;           // shaft half-width
+  const gr = sr * 1.16;       // glans half-width
+  const gH = L * 0.29;        // glans height
+  const sTopY = baseY - (L - gH);
+  const tipY  = baseY - L;
+
+  // Main outline
+  const p = [
+    `M ${cx-sr} ${baseY}`,
+    `L ${cx-sr} ${sTopY + gH*0.06}`,
+    `C ${cx-sr} ${sTopY-gH*0.04} ${cx-gr} ${sTopY-gH*0.04} ${cx-gr} ${sTopY-gH*0.10}`,
+    `Q ${cx-gr} ${tipY+gH*0.07} ${cx} ${tipY}`,
+    `Q ${cx+gr} ${tipY+gH*0.07} ${cx+gr} ${sTopY-gH*0.10}`,
+    `C ${cx+gr} ${sTopY-gH*0.04} ${cx+sr} ${sTopY-gH*0.04} ${cx+sr} ${sTopY+gH*0.06}`,
+    `L ${cx+sr} ${baseY}`,
+    `Z`,
+  ].join(' ');
+
+  // Corona groove
+  const gy = sTopY - gH * 0.06;
+  const groove = `M ${cx-gr+gr*0.12} ${gy} Q ${cx} ${gy+gH*0.04} ${cx+gr-gr*0.12} ${gy}`;
+
+  return { p, groove };
+}
+
+function shapeSVG(person, t, svgW, svgH, sc) {
+  const l = lerp(person.ls, person.le, t);
+  const g = lerp(person.gs, person.ge, t);
+  const cx = svgW / 2, baseY = svgH - 5;
+  const { p, groove } = penisPath(cx, baseY, l, g, sc);
+
+  const fills = {
+    subject: ['#c84040','#e05858','rgba(220,80,80,.3)'],
+    host:    ['#b8902a','#d4a840','rgba(200,160,50,.28)'],
+    typical: ['#8090a0','#9aaabb','rgba(130,160,180,.28)'],
+    _:       ['#b0bcc8','#c8d4de','rgba(160,190,210,.28)'],
+  };
+  const [fill, stroke, grooveC] = fills[person.type] || fills._;
+
+  return `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
+    <path d="${p}" fill="${fill}" stroke="${stroke}" stroke-width="0.7" opacity="0.93"/>
+    <path d="${groove}" fill="none" stroke="${grooveC}" stroke-width="1.1"/>
+  </svg>`;
+}
+
+function typeColor(type) {
+  return { subject:'var(--c-brian)', host:'var(--c-host)', familiar:'var(--c-fam)', newer:'var(--c-new)' }[type] || 'var(--text)';
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function vol(l, g) { return g * g * l / (4 * Math.PI); }
+
+function sliderT(id) { return (document.getElementById(id)?.value || 100) / 100; }
+
+// ─── GROUP ───────────────────────────────────────────────────────────────────
+
+function renderGroup() {
+  const t = sliderT('grp-sl');
+  const sorted = [...PEOPLE].sort((a,b) => a.le - b.le);
+  const row = document.getElementById('grp-row');
+  if (!row) return;
+
+  row.innerHTML = sorted.map(p => {
+    const l = lerp(p.ls, p.le, t).toFixed(2);
+    const g = lerp(p.gs, p.ge, t).toFixed(2);
+    const svg = shapeSVG(p, t, 100, 430, SCALE);
+    const col = typeColor(p.type);
+    return `<div class="s-col">
+      <div class="s-svg-wrap">${svg}</div>
+      <div class="base-bar"></div>
+      <div class="s-lbl">
+        <span class="nm" style="color:${col}">${p.name}</span>
+        <span class="ms">${l}" × ${g}"∅</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderGroupStats(t);
+}
+
+function renderGroupStats(t) {
+  const brian = PEOPLE.find(p => p.id === 'brian');
+  const dads  = PEOPLE.filter(p => p.id !== 'brian');
+
+  const bL = lerp(brian.ls, brian.le, t);
+  const bG = lerp(brian.gs, brian.ge, t);
+  const bV = vol(bL, bG);
+
+  const dL = dads.map(d => lerp(d.ls, d.le, t));
+  const dG = dads.map(d => lerp(d.gs, d.ge, t));
+  const dV = dads.map((d,i) => vol(dL[i], dG[i]));
+
+  const avgL = dL.reduce((a,b)=>a+b,0)/dL.length;
+  const avgG = dG.reduce((a,b)=>a+b,0)/dG.length;
+  const avgV = dV.reduce((a,b)=>a+b,0)/dV.length;
+
+  const minL = Math.min(...dL);
+  const state = t > .5 ? 'Erect' : 'Soft';
+
+  document.getElementById('grp-stats').innerHTML = [
+    stat(`Brian — ${state} Length`, `${bL.toFixed(2)}"`, `Dad avg: ${avgL.toFixed(2)}"`),
+    stat('Length Gap (avg)',         `−${(avgL-bL).toFixed(2)}"`, `${((avgL-bL)/avgL*100).toFixed(0)}% shorter than avg dad`),
+    stat('Closest Dad Gap',          `−${(minL-bL).toFixed(2)}"`, `vs Dad 1 at ${minL.toFixed(2)}"`),
+    stat(`Brian — ${state} Girth`,   `${bG.toFixed(2)}"`, `Dad avg: ${avgG.toFixed(2)}"`),
+    stat('Girth Gap (avg)',           `−${(avgG-bG).toFixed(2)}"`, `${((avgG-bG)/avgG*100).toFixed(0)}% narrower than avg dad`),
+    stat('Volume Ratio',              `${(bV/avgV*100).toFixed(1)}%`, `Brian vs avg dad volume`),
+  ].join('');
+}
+
+function stat(lbl, val, sub) {
+  return `<div class="stat-card">
+    <div class="lbl">${lbl}</div>
+    <div class="val">${val}</div>
+    <div class="sub">${sub}</div>
+  </div>`;
+}
+
+// ─── DEVELOPMENTAL ────────────────────────────────────────────────────────────
+
+function renderDev() {
+  renderDevChart();
+  renderDevPanel();
+}
+
+function renderDevChart() {
+  const svg = document.getElementById('dev-svg');
+  if (!svg) return;
+
+  const W=620, H=390, pL=50, pR=22, pT=26, pB=48;
+  const cW = W-pL-pR, cH = H-pT-pB;
+  const ageMin=7, ageMax=20, sMin=0, sMax=7;
+
+  const t = sliderT('dev-sl');
+  const brian = PEOPLE.find(p => p.id==='brian');
+  const bVal = lerp(brian.ls, brian.le, t);
+  const state = t > .5 ? 'erect' : 'soft';
+
+  const xp = a => pL + (a-ageMin)/(ageMax-ageMin)*cW;
+  const yp = s => pT + cH - (s-sMin)/(sMax-sMin)*cH;
+
+  // Polygon helpers
+  const pts = (key) => DEV.map(d=>`${xp(d.age)},${yp(d[key])}`).join(' ');
+  const band = (k1,k2) => DEV.map(d=>`${xp(d.age)},${yp(d[k1])}`).join(' ') + ' ' +
+                            [...DEV].reverse().map(d=>`${xp(d.age)},${yp(d[k2])}`).join(' ');
+
+  // Find equivalent age on P50 for Brian's current value
+  let eqAge = null;
+  for (let i=0; i<DEV.length-1; i++) {
+    const a=DEV[i], b=DEV[i+1];
+    if (bVal>=a.p50 && bVal<=b.p50) {
+      eqAge = a.age + (bVal-a.p50)/(b.p50-a.p50)*(b.age-a.age);
+      break;
+    }
+  }
+  if (bVal < DEV[0].p50) eqAge = DEV[0].age;
+  if (!eqAge) eqAge = null; // above P50 adult (shouldn't happen for Brian)
+
+  // Grid
+  let grid = '';
+  for (let s=0; s<=7; s++) {
+    grid += `<line x1="${pL}" y1="${yp(s)}" x2="${W-pR}" y2="${yp(s)}" stroke="#172030" stroke-width="1"/>`;
+    grid += `<text x="${pL-8}" y="${yp(s)+4}" text-anchor="end" fill="#3d5570" font-size="9" font-family="monospace">${s}"</text>`;
+  }
+  for (let age=7; age<=20; age++) {
+    const x=xp(age);
+    grid += `<line x1="${x}" y1="${pT}" x2="${x}" y2="${H-pB}" stroke="#111e2c" stroke-width="1"/>`;
+    if (age%2===1||age===20) grid += `<text x="${x}" y="${H-pB+14}" text-anchor="middle" fill="#3d5570" font-size="9" font-family="monospace">${age}</text>`;
+  }
+
+  // Axis labels
+  grid += `<text x="${pL+cW/2}" y="${H-6}" text-anchor="middle" fill="#3d5570" font-size="9" font-family="monospace" letter-spacing=".12em">AGE</text>`;
+  grid += `<text x="11" y="${pT+cH/2}" text-anchor="middle" fill="#3d5570" font-size="9" font-family="monospace" transform="rotate(-90,11,${pT+cH/2})">ERECT LENGTH (IN)</text>`;
+
+  // Brian line
+  const bY = yp(bVal);
+  const bLine = `
+    <line x1="${pL}" y1="${bY}" x2="${W-pR}" y2="${bY}" stroke="rgba(200,64,64,.5)" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <circle cx="${W-pR-5}" cy="${bY}" r="4" fill="#c84040" opacity=".88"/>
+    <text x="${W-pR-13}" y="${bY-7}" text-anchor="end" fill="#c84040" font-size="9" font-family="monospace">Brian (${state}) ${bVal.toFixed(2)}"</text>
+  `;
+
+  // Equivalent age marker
+  let eqLine = '';
+  if (eqAge) {
+    const ex = xp(eqAge);
+    eqLine = `<line x1="${ex}" y1="${pT}" x2="${ex}" y2="${H-pB}" stroke="rgba(200,64,64,.28)" stroke-width="1.2" stroke-dasharray="3,4"/>
+      <text x="${ex+4}" y="${pT+14}" fill="rgba(200,80,80,.6)" font-size="8.5" font-family="monospace">P50≈age ${eqAge.toFixed(0)}</text>`;
+  }
+
+  // P-line labels (placed at age ~13.5 so they don't overlap Brian's marker)
+  const pLabels = `
+    <text x="${xp(13.8)}" y="${yp(5.65)}" fill="rgba(70,130,190,.45)" font-size="8.5" font-family="monospace">P75</text>
+    <text x="${xp(13.8)}" y="${yp(5.08)}" fill="rgba(90,160,220,.65)" font-size="8.5" font-family="monospace">P50</text>
+    <text x="${xp(13.8)}" y="${yp(4.50)}" fill="rgba(70,130,190,.45)" font-size="8.5" font-family="monospace">P25</text>
+  `;
+
+  svg.innerHTML = `
+    ${grid}
+    <polygon points="${band('p10','p90')}" fill="rgba(40,90,160,.07)" stroke="none"/>
+    <polygon points="${band('p25','p75')}" fill="rgba(40,90,160,.12)" stroke="none"/>
+    <polyline points="${pts('p10')}" fill="none" stroke="rgba(45,100,170,.25)" stroke-width="1"/>
+    <polyline points="${pts('p90')}" fill="none" stroke="rgba(45,100,170,.25)" stroke-width="1"/>
+    <polyline points="${pts('p25')}" fill="none" stroke="rgba(65,140,200,.40)" stroke-width="1.2"/>
+    <polyline points="${pts('p75')}" fill="none" stroke="rgba(65,140,200,.40)" stroke-width="1.2"/>
+    <polyline points="${pts('p50')}" fill="none" stroke="rgba(90,170,230,.70)" stroke-width="2"/>
+    ${eqLine}
+    ${bLine}
+    ${pLabels}
+  `;
+}
+
+function renderDevPanel() {
+  const t = sliderT('dev-sl');
+  const brian = PEOPLE.find(p => p.id==='brian');
+  const state = t > .5 ? 'Erect' : 'Soft';
+
+  // Comparison shapes — smaller scale
+  const bSVG  = shapeSVG(brian, t, 80, 210, DSCALE);
+  const tySVG = shapeSVG(TYPICAL_ADULT, t, 80, 210, DSCALE);
+
+  document.getElementById('dev-compare').innerHTML =
+    mkMiniShape(bSVG, '#c84040', 'Brian', brian, t) +
+    mkMiniShape(tySVG, 'var(--c-shape)', 'Typical\nAdult', TYPICAL_ADULT, t);
+
+  // Stats
+  const bL = lerp(brian.ls, brian.le, t);
+  const bG = lerp(brian.gs, brian.ge, t);
+  const tL = lerp(TYPICAL_ADULT.ls, TYPICAL_ADULT.le, t);
+  const tG = lerp(TYPICAL_ADULT.gs, TYPICAL_ADULT.ge, t);
+
+  document.getElementById('dev-stats').innerHTML = `
+    <h3>Brian vs. Typical Adult — ${state}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      ${miniStat('Length',bL.toFixed(2)+'"',`${((bL/tL)*100).toFixed(0)}% of typical`,'#c8d8e8')}
+      ${miniStat('Girth',bG.toFixed(2)+'"',`${((bG/tG)*100).toFixed(0)}% of typical`,'#c8d8e8')}
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:10px;margin-top:2px;">
+        ${miniStat('P50 Dev. Equiv.','~Age 12','Stalled approx. 37 yrs below median','#c87878')}
+      </div>
+    </div>`;
+}
+
+function mkMiniShape(svg, color, name, person, t) {
+  const l = lerp(person.ls, person.le, t).toFixed(2);
+  const g = lerp(person.gs, person.ge, t).toFixed(2);
+  const lines = name.split('\n');
+  return `<div style="display:flex;flex-direction:column;align-items:center;">
+    ${svg}
+    <div class="base-bar" style="width:50px;margin-top:3px;"></div>
+    <div class="mini-lbl" style="color:${color}">
+      <strong>${lines.join('<br>')}</strong>
+      <br><span style="opacity:.6;font-size:9px;">${l}" × ${g}"</span>
+    </div>
+  </div>`;
+}
+
+function miniStat(lbl, val, sub, c) {
+  return `<div>
+    <div style="font-size:9px;opacity:.5;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em;">${lbl}</div>
+    <div style="font-size:16px;color:${c||'var(--bright)'};">${val}</div>
+    <div style="font-size:9px;opacity:.4;margin-top:2px;">${sub}</div>
+  </div>`;
+}
+
+// ─── CONTROLS ────────────────────────────────────────────────────────────────
+
+const anim = {};
+
+function animSlider(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (anim[id]) cancelAnimationFrame(anim[id]);
+
+  const start = +el.value, diff = target - start;
+  const t0 = performance.now();
+  const dur = 550;
+
+  (function step(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    const e = 1 - Math.pow(1 - p, 3); // cubic ease-out
+    el.value = Math.round(start + diff * e);
+    renderAll();
+    if (p < 1) anim[id] = requestAnimationFrame(step);
+  })(t0);
+}
+
+function switchTab(name) {
+  ['dev','grp'].forEach(n => {
+    document.getElementById(`pane-${n}`).classList.toggle('active', n===name);
+    document.querySelectorAll('.tab')[n==='dev'?0:1].classList.toggle('active', n===name);
+  });
+  renderAll();
+}
+
+function renderAll() {
+  renderGroup();
+  renderDev();
+}
+
+// Init
+renderAll();
+</script>
+</body>
+</html>
