@@ -112,28 +112,12 @@ input[type=range]::-moz-range-thumb {
     <button class="state-btn on" onclick="animSlider('dev-sl',100)">Erect</button>
     <span class="sl-lbl">ERECT</span>
   </div>
-  <div class="dev-grid">
-    <div>
-      <div class="dev-chart-wrap">
-        <svg id="dev-svg" width="100%" viewBox="0 0 620 390" style="display:block;"></svg>
-      </div>
-      <p class="chart-note">
-        Shaded bands: typical erect length by age (P10–P90 outer, P25–P75 inner, P50 median).
-        Brian's marker tracks selected state. Developmental percentiles are for erect length.
-      </p>
-    </div>
-    <div class="side-panel">
-      <div class="inset">
-        <h3>Brian vs. Typical Adult (P50)</h3>
-        <div class="dev-shapes-row" id="dev-compare"></div>
-        <div class="legend">
-          <div class="leg-item"><div class="leg-dot" style="background:var(--c-brian)"></div><span>Brian</span></div>
-          <div class="leg-item"><div class="leg-dot" style="background:#8090a8"></div><span>Typical Adult</span></div>
-        </div>
-      </div>
-      <div class="inset" id="dev-stats"></div>
-    </div>
-  </div>
+  <div class="shapes-scroll"><div id="dev-row"></div></div>
+  <p class="chart-note" style="margin-top:12px;">
+    P50 erect length by age vs. Brian (red, dashed outline). Brian sorts into the sequence by actual size.
+    Girth estimated from age-adjusted length:girth ratios. Developmental stages smooth — adult dads hairy.
+  </p>
+  <div class="stats" id="dev-stats"></div>
 </div>
 
 <div id="pane-grp" class="pane">
@@ -154,6 +138,10 @@ input[type=range]::-moz-range-thumb {
     <div class="leg-item"><div class="leg-dot" style="background:var(--c-new)"></div><span>Newer Connections</span></div>
   </div>
   <div class="stats" id="grp-stats"></div>
+  <div style="margin-top:28px;border-top:1px solid var(--border);padding-top:22px;">
+    <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text);opacity:.5;margin-bottom:16px;">Side View — Brian vs Host</div>
+    <div style="overflow-x:auto;"><div id="side-row"></div></div>
+  </div>
 </div>
 
 <script>
@@ -274,11 +262,11 @@ function buildVeins(rng, cx, coronaY, baseY, sr) {
 }
 
 function buildShape(id, cx, baseY, lengthPx, diamPx) {
-  const smooth  = (id === 'brian');
+  const smooth  = (id === 'brian') || id.startsWith('age_');
   const rng     = seededRand(idSeed(id));
   const sr      = diamPx / 2;
-  const gr      = sr * 1.44;
-  const gH      = lengthPx * 0.23;
+  const gr      = sr * 1.36;
+  const gH      = lengthPx * 0.22;
   const sH      = lengthPx - gH;
   const sbr     = sr * 1.06;
   const coronaY = baseY - sH;
@@ -296,18 +284,18 @@ function buildShape(id, cx, baseY, lengthPx, diamPx) {
   const glansP = [
     `M ${cx-sr}  ${coronaY}`,
     `C ${cx-sr*1.05} ${coronaY-gH*.04} ${cx-gr} ${coronaY-gH*.17} ${cx-gr} ${coronaY-gH*.30}`,
-    `C ${cx-gr}  ${coronaY-gH*.62} ${cx-gr*.32} ${tipY+gH*.05} ${cx} ${tipY}`,
-    `C ${cx+gr*.32} ${tipY+gH*.05} ${cx+gr} ${coronaY-gH*.62} ${cx+gr} ${coronaY-gH*.30}`,
+    `C ${cx-gr}  ${coronaY-gH*.58} ${cx-gr*.44} ${tipY+gH*.06} ${cx} ${tipY}`,
+    `C ${cx+gr*.44} ${tipY+gH*.06} ${cx+gr} ${coronaY-gH*.58} ${cx+gr} ${coronaY-gH*.30}`,
     `C ${cx+gr}  ${coronaY-gH*.17} ${cx+sr*1.05} ${coronaY-gH*.04} ${cx+sr} ${coronaY}`,`Z`
   ].join(' ');
 
   const grooveP  = `M ${cx-gr*.90} ${coronaY+gH*.09} Q ${cx} ${coronaY+gH*.18} ${cx+gr*.90} ${coronaY+gH*.09}`;
   const midlineP = `M ${cx} ${coronaY} L ${cx} ${baseY}`;
 
-  const pubicHair = smooth ? '' : buildHairStrands(seededRand(idSeed(id)+99), 58,
-    (r)=>{ const sp=(r()-.5)*sr*2.9; return [cx+sp, baseY+r()*sr*.45]; },
-    {angle:r=>(r()-.5)*2.3, lenMin:9,lenRange:18,curl:7,
-     color:'#1c0a04',wMin:.55,wRange:.85,opMin:.48,opRange:.44});
+  const pubicHair = smooth ? '' : buildHairStrands(seededRand(idSeed(id)+99), 90,
+    (r)=>{ const sp=(r()-.5)*sr*4.0; return [cx+sp, baseY+r()*sr*.55]; },
+    {angle:r=>(r()-.5)*2.4, lenMin:13,lenRange:24,curl:8,
+     color:'#1c0a04',wMin:.55,wRange:.90,opMin:.48,opRange:.44});
 
   return `
     <defs>
@@ -358,6 +346,112 @@ function buildShape(id, cx, baseY, lengthPx, diamPx) {
     <ellipse cx="${cx}" cy="${tipY+mRy*2.4}" rx="${mRx}" ry="${mRy}"
       fill="#1a0804" opacity=".55"/>
   `;
+}
+
+// ─── SIDE VIEW RENDERER ──────────────────────────────────────────────────────
+// dir: 1 = shaft extends right (normal), -1 = shaft extends left (mirrored)
+function buildShapeSide(id, x0, midY, lengthPx, diamPx, smooth, dir) {
+  dir = dir||1;
+  const sr   = diamPx / 2;
+  const gr   = sr * 1.36;
+  const gW   = lengthPx * 0.22;
+  const sW   = lengthPx - gW;
+  const sbr  = sr * 1.04;
+  const tipX    = x0 + dir*lengthPx;
+  const gStartX = x0 + dir*sW;
+  const scarX   = x0 + dir*(sW + gW*0.28);
+  const mRx = Math.max(1.5, gr*0.11), mRy = Math.max(0.9, mRx*0.38);
+  const ts  = (idSeed(id)*2+41)%97+1;
+  const bR  = Math.min(sr*1.35, 46);
+
+  const shaftP = [
+    `M ${x0} ${midY-sbr}`,`L ${gStartX} ${midY-sr}`,
+    `L ${gStartX} ${midY+sr}`,`L ${x0} ${midY+sbr}`,`Z`
+  ].join(' ');
+  const glansP = [
+    `M ${gStartX} ${midY-sr}`,
+    `C ${gStartX+dir*gW*.05} ${midY-sr*1.06} ${gStartX+dir*gW*.20} ${midY-gr} ${gStartX+dir*gW*.32} ${midY-gr}`,
+    `L ${tipX-dir*gW*.18} ${midY-gr*.28}`,
+    `Q ${tipX} ${midY-gr*.10} ${tipX} ${midY}`,
+    `Q ${tipX} ${midY+gr*.10} ${tipX-dir*gW*.18} ${midY+gr*.28}`,
+    `L ${gStartX+dir*gW*.32} ${midY+gr}`,
+    `C ${gStartX+dir*gW*.20} ${midY+gr} ${gStartX+dir*gW*.05} ${midY+sr*1.06} ${gStartX} ${midY+sr}`,`Z`
+  ].join(' ');
+  const gTop = `M ${gStartX} ${midY-sr} Q ${gStartX+dir*gW*.14} ${midY-gr*.82} ${gStartX+dir*gW*.28} ${midY-gr}`;
+  const gBot = `M ${gStartX} ${midY+sr} Q ${gStartX+dir*gW*.14} ${midY+gr*.82} ${gStartX+dir*gW*.28} ${midY+gr}`;
+  const dorsP = `M ${x0} ${midY-sr*.18} L ${gStartX} ${midY-sr*.18}`;
+
+  let out = `<defs>
+    <linearGradient id="ssh_${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${midY-sbr}" x2="0" y2="${midY+sbr}">
+      <stop offset="0%"   stop-color="#8c4820"/>
+      <stop offset="14%"  stop-color="#d08050"/>
+      <stop offset="38%"  stop-color="#f2c898"/>
+      <stop offset="58%"  stop-color="#e0a070"/>
+      <stop offset="86%"  stop-color="#9c5025"/>
+      <stop offset="100%" stop-color="#7a3c18"/>
+    </linearGradient>
+    <linearGradient id="sgl_${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${midY-gr}" x2="0" y2="${midY+gr}">
+      <stop offset="0%"   stop-color="#7c3020"/>
+      <stop offset="16%"  stop-color="#b85040"/>
+      <stop offset="42%"  stop-color="#e09080"/>
+      <stop offset="60%"  stop-color="#cc7060"/>
+      <stop offset="88%"  stop-color="#8c3025"/>
+      <stop offset="100%" stop-color="#6a2818"/>
+    </linearGradient>
+    <radialGradient id="sbg_${id}" cx="36%" cy="30%" r="65%">
+      <stop offset="0%"   stop-color="#d49060"/>
+      <stop offset="45%"  stop-color="#a86030"/>
+      <stop offset="100%" stop-color="#6e3510"/>
+    </radialGradient>
+    <radialGradient id="shl_${id}" cx="50%" cy="18%" r="65%">
+      <stop offset="0%"   stop-color="rgba(255,240,220,.38)"/>
+      <stop offset="100%" stop-color="rgba(255,210,180,0)"/>
+    </radialGradient>
+    <filter id="stx_${id}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.30 0.55" numOctaves="4" seed="${ts}" result="n"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.10  0 0 0 0 0.05  0 0 0 0 0.02  0 0 0 0.20 0" in="n" result="t"/>
+      <feComposite in="t" in2="SourceGraphic" operator="in" result="m"/>
+      <feBlend in="SourceGraphic" in2="m" mode="multiply"/>
+    </filter>
+  </defs>
+  <ellipse cx="${(x0+dir*sr*.4).toFixed(1)}" cy="${(midY+sr+bR*.65).toFixed(1)}" rx="${(bR*1.05).toFixed(1)}" ry="${(bR*1.25).toFixed(1)}" fill="url(#sbg_${id})" stroke="#5e2c0e" stroke-width="0.7"/>
+  `;
+  if(!smooth){
+    const hr=seededRand(idSeed(id)+55);
+    out+=buildHairStrands(hr,55,
+      (r)=>[x0+dir*(r()-.5)*sr*2.2, midY+sr*(0.5+r()*.6)],
+      {angle:r=>(r()-.5)*Math.PI*.55+Math.PI*.5,lenMin:10,lenRange:20,curl:6,
+       color:'#1c0a04',wMin:.55,wRange:.85,opMin:.50,opRange:.42});
+  }
+  out+=`
+  <g filter="url(#stx_${id})">
+    <path d="${shaftP}" fill="url(#ssh_${id})" stroke="#5a2810" stroke-width="0.7" stroke-linejoin="round"/>
+    <path d="${shaftP}" fill="url(#shl_${id})" stroke="none"/>
+  </g>
+  <path d="${dorsP}" fill="none" stroke="rgba(55,18,8,.12)" stroke-width="1.2"/>
+  <line x1="${scarX}" y1="${midY-sr*.92}" x2="${scarX}" y2="${midY+sr*.92}" stroke="rgba(60,18,8,.30)" stroke-width="1.3"/>
+  <g filter="url(#stx_${id})">
+    <path d="${glansP}" fill="url(#sgl_${id})" stroke="#4a1a0e" stroke-width="0.7"/>
+    <path d="${glansP}" fill="url(#shl_${id})" stroke="none"/>
+  </g>
+  <path d="${gTop}" fill="none" stroke="rgba(28,8,3,.65)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="${gBot}" fill="none" stroke="rgba(28,8,3,.65)" stroke-width="2.5" stroke-linecap="round"/>
+  <ellipse cx="${(tipX-dir*mRx*2.2).toFixed(1)}" cy="${midY}" rx="${mRx}" ry="${mRy}" fill="#1a0804" opacity=".50"/>`;
+  return out;
+}
+
+// ─── DEVELOPMENTAL DATA HELPERS ──────────────────────────────────────────────
+function devGirth(age, erL) {
+  return erL * (age<=10?0.68 : age<=13?0.76 : age<=16?0.83 : 0.88);
+}
+function getDevPeople() {
+  const ages = DEV.filter(d=>[7,9,11,13,15,17,20].includes(d.age));
+  return ages.map(d=>({
+    id:`age_${d.age}`, name:`Age ${d.age}`,
+    le:d.p50, ls:d.p50*.57,
+    ge:devGirth(d.age,d.p50), gs:devGirth(d.age,d.p50)*.60,
+    type:'dev'
+  }));
 }
 
 // Full <svg> element for a person at given t (0=soft, 1=erect)
@@ -451,6 +545,7 @@ function renderGroup(){
 
   document.getElementById('grp-row').innerHTML = svg;
   renderGroupStats(t);
+  renderSideCompare();
 }
 
 function renderGroupStats(t){
@@ -476,9 +571,130 @@ function renderGroupStats(t){
 }
 function sc(lbl,val,sub){return`<div class="stat-card"><div class="lbl">${lbl}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;}
 
+// ─── SIDE VIEW COMPARISON ────────────────────────────────────────────────────
+function renderSideCompare(){
+  const t     = sliderT('grp-sl');
+  const brian = PEOPLE.find(p=>p.id==='brian');
+  const host  = PEOPLE.find(p=>p.id==='host');
+  const SC    = 38;
+  const PAD   = 24, GAP = 50;
+
+  const bL=lerp(brian.ls,brian.le,t), bG=lerp(brian.gs,brian.ge,t);
+  const hL=lerp(host.ls,host.le,t),  hG=lerp(host.gs,host.ge,t);
+  const bLen=bL*SC, bDia=(bG/Math.PI)*SC;
+  const hLen=hL*SC, hDia=(hG/Math.PI)*SC;
+
+  const maxSr   = Math.max(bDia,hDia)/2;
+  const maxBR   = Math.min(maxSr*1.35,46);
+  const midY    = PAD + Math.max(bDia,hDia)/2 + 4;
+  const scrBot  = midY + maxSr + maxBR*2.4;
+  const totalH  = scrBot + 36;
+
+  // Brian on left facing right; Host on right facing left
+  const bX0   = PAD;
+  const hX0   = PAD + bLen + GAP + hLen;
+  const totalW= PAD + bLen + GAP + hLen + PAD;
+
+  const bSmooth = true; // Brian shaved
+  const hSmooth = false;
+
+  const svg=`<svg width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <rect width="${totalW}" height="${totalH}" fill="white"/>
+    ${buildShapeSide('bs', bX0, midY, bLen, bDia, bSmooth, 1)}
+    ${buildShapeSide('hs', hX0, midY, hLen, hDia, hSmooth, -1)}
+    <text x="${bX0+bLen/2}" y="${totalH-18}" text-anchor="middle" fill="#c84040" font-size="10" font-family="monospace" font-weight="bold">Brian</text>
+    <text x="${bX0+bLen/2}" y="${totalH-6}"  text-anchor="middle" fill="#999" font-size="8.5" font-family="monospace">${bL.toFixed(2)}" × ${bG.toFixed(2)}"</text>
+    <text x="${hX0-hLen/2}" y="${totalH-18}" text-anchor="middle" fill="#c8a030" font-size="10" font-family="monospace" font-weight="bold">Host</text>
+    <text x="${hX0-hLen/2}" y="${totalH-6}"  text-anchor="middle" fill="#999" font-size="8.5" font-family="monospace">${hL.toFixed(2)}" × ${hG.toFixed(2)}"</text>
+  </svg>`;
+  document.getElementById('side-row').innerHTML=svg;
+}
+
+// ─── DEVELOPMENTAL SHAPES VIEW ───────────────────────────────────────────────
+function renderDevShapes(){
+  const t      = sliderT('dev-sl');
+  const DEV_SC = 34;
+  const RULER_W=50, COL_W=100, PAD_T=18;
+
+  const devPeople = getDevPeople();
+  const brian     = PEOPLE.find(p=>p.id==='brian');
+  // Merge: dev ages + Brian, sort by erect length
+  const all = [...devPeople, {...brian}].sort((a,b)=>a.le-b.le);
+
+  const maxLen  = all.reduce((m,p)=>Math.max(m,lerp(p.ls,p.le,1)),0);
+  const maxH_px = Math.ceil(maxLen*DEV_SC)+PAD_T;
+  const baseY   = maxH_px;
+  const maxBR   = all.reduce((m,p)=>{
+    const g=lerp(p.gs,p.ge,1); const sr=(g/Math.PI/2)*DEV_SC;
+    return Math.max(m, Math.min(sr*1.38,52)*1.32 + Math.min(sr*1.38,52)*0.99);
+  },0);
+  const LABEL_OFF = maxBR+14;
+  const PAD_B = maxBR+46;
+  const totalH= maxH_px+PAD_B;
+  const totalW= RULER_W+all.length*COL_W+14;
+  const maxInch=Math.ceil(maxLen)+1;
+
+  let ruler=`<line x1="${RULER_W-1}" y1="${PAD_T-4}" x2="${RULER_W-1}" y2="${baseY}" stroke="#ccc" stroke-width="1.5"/>`;
+  for(let inch=0;inch<=maxInch;inch++){
+    const y=baseY-inch*DEV_SC; if(y<0)break;
+    ruler+=`<line x1="${RULER_W-11}" y1="${y}" x2="${RULER_W-1}" y2="${y}" stroke="#999" stroke-width="1.5"/>`;
+    ruler+=`<text x="${RULER_W-15}" y="${y+4}" text-anchor="end" fill="#777" font-size="10" font-family="monospace">${inch}"</text>`;
+    ruler+=`<line x1="${RULER_W}" y1="${y}" x2="${totalW}" y2="${y}" stroke="rgba(0,0,0,.07)" stroke-width="1"/>`;
+    if(inch<maxInch){ const hy=baseY-(inch+.5)*DEV_SC; if(hy>=0){
+      ruler+=`<line x1="${RULER_W-7}" y1="${hy}" x2="${RULER_W-1}" y2="${hy}" stroke="#ccc" stroke-width="1"/>`;
+      ruler+=`<line x1="${RULER_W}" y1="${hy}" x2="${totalW}" y2="${hy}" stroke="rgba(0,0,0,.04)" stroke-width="1"/>`;
+    }}
+  }
+  ruler+=`<line x1="${RULER_W-1}" y1="${baseY}" x2="${totalW}" y2="${baseY}" stroke="#bbb" stroke-width="1.5"/>`;
+
+  let shapes='';
+  all.forEach((p,i)=>{
+    const cx=RULER_W+i*COL_W+COL_W/2;
+    const l=lerp(p.ls,p.le,t), g=lerp(p.gs,p.ge,t);
+    const lenPx=l*DEV_SC, diaPx=(g/Math.PI)*DEV_SC;
+    shapes+=buildShape(p.id,cx,baseY,lenPx,diaPx);
+    const col=typeColorHex(p.type==='subject'?'subject':'dev');
+    const isBrian=(p.id==='brian');
+    if(isBrian) shapes+=`<rect x="${cx-COL_W/2+4}" y="${PAD_T}" width="${COL_W-8}" height="${baseY-PAD_T}" fill="rgba(200,64,64,.05)" stroke="rgba(200,64,64,.18)" stroke-width="1" stroke-dasharray="4,3"/>`;
+    shapes+=`<text x="${cx}" y="${baseY+LABEL_OFF}" text-anchor="middle" fill="${isBrian?'#c84040':col}" font-size="9.5" font-family="monospace" font-weight="bold">${isBrian?'Brian':p.name}</text>`;
+    shapes+=`<text x="${cx}" y="${baseY+LABEL_OFF+13}" text-anchor="middle" fill="#999" font-size="8" font-family="monospace">${l.toFixed(2)}"</text>`;
+  });
+
+  const svg=`<svg width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <rect width="${totalW}" height="${totalH}" fill="#f6f4f2"/>
+    <rect x="${RULER_W}" y="0" width="${totalW-RULER_W}" height="${totalH}" fill="white"/>
+    ${ruler}${shapes}
+  </svg>`;
+  document.getElementById('dev-row').innerHTML=svg;
+  renderDevStats(t);
+}
+
+function renderDevStats(t){
+  const brian=PEOPLE.find(p=>p.id==='brian');
+  const bL=lerp(brian.ls,brian.le,t), bG=lerp(brian.gs,brian.ge,t);
+  const p50Adult=DEV[DEV.length-1].p50;
+  const gAdult=devGirth(20,p50Adult);
+  const state=t>.5?'Erect':'Soft';
+  // Find approximate developmental equivalent age
+  let eqAge=null;
+  for(let i=0;i<DEV.length-1;i++){
+    if(bL>=DEV[i].p50&&bL<=DEV[i+1].p50){
+      eqAge=DEV[i].age+(bL-DEV[i].p50)/(DEV[i+1].p50-DEV[i].p50)*(DEV[i+1].age-DEV[i].age);
+      break;
+    }
+  }
+  if(bL<DEV[0].p50) eqAge=DEV[0].age;
+  document.getElementById('dev-stats').innerHTML=[
+    sc(`Brian — ${state} Length`,`${bL.toFixed(2)}"`,`P50 adult: ${p50Adult.toFixed(2)}"`),
+    sc('vs Adult P50',`${((bL/p50Adult)*100).toFixed(0)}%`,`${(p50Adult-bL).toFixed(2)}" shorter`),
+    sc('Dev. Equivalent',eqAge?`~Age ${eqAge.toFixed(0)}`:'Below P10 age 7','P50 reference'),
+    sc(`${state} Girth`,`${bG.toFixed(2)}"`,`vs adult avg ${gAdult.toFixed(2)}"`),
+  ].join('');
+}
+
 // ─── DEVELOPMENTAL VIEW ───────────────────────────────────────────────────────
 
-function renderDev(){ renderDevChart(); renderDevPanel(); }
+function renderDev(){ renderDevShapes(); }
 
 function renderDevChart(){
   const svg=document.getElementById('dev-svg'); if(!svg)return;
