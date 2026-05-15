@@ -121,14 +121,17 @@ function seededRand(seed){
   return function(){s=((Math.imul(s,1664525)+1013904223)&0xffffffff)>>>0;return s/4294967295;};
 }
 
-// Non-linear glans scaling: prepubescent shapes have smaller heads relative to shaft.
-// Formula calibrated so age-7 (1.5") ~ 0.62 and adult (5.2") reaches 0.95.
+// Glans scaling — medically calibrated.
+// Prepubertal: shaft is underdeveloped, glans is wider than shaft and ~35-40% of total length.
+// Puberty: shaft elongates rapidly, glans grows slowly — ratio falls.
+// Adult: glans ~90-92% of shaft width, ~25-28% of total length.
+//   gr=1.20 @ 1.5" (age 7) → gr=0.90 @ 5.2" (adult)
+//   Glans wider than shaft (gr>1) through early teens (~4" / age 13).
 function glansRatio(lenIn, id){
-  var base=Math.max(0.60,Math.min(0.95, 0.50+lenIn*0.087));
+  var base=Math.max(0.88,Math.min(1.22, 1.322-lenIn*0.081));
   if(!id||id==='brian'||id.startsWith('age_'))return base;
-  // Per-dad variation: ±0.06 on head ratio
   var rng=seededRand(hashStr(id));rng();rng();
-  return Math.max(0.55,Math.min(0.97, base+(rng()-0.5)*0.12));
+  return Math.max(0.78,Math.min(1.30, base+(rng()-0.5)*0.16));
 }
 
 // Glans height aspect variation (taller vs flatter corona) per person
