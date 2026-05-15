@@ -69,7 +69,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px;
   <div class="slider-row">
     <span class="sl-lbl l">SOFT</span>
     <button class="state-btn"    onclick="animSlider('dev-sl',0)">Soft</button>
-    <input  type="range" id="dev-sl" min="0" max="100" value="100" oninput="renderAll()">
+    <input  type="range" id="dev-sl" min="0" max="100" value="100" oninput="cancelAnim('dev-sl');renderAll()">
     <button class="state-btn on" onclick="animSlider('dev-sl',100)">Erect</button>
     <span class="sl-lbl">ERECT</span>
   </div>
@@ -82,7 +82,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px;
   <div class="slider-row">
     <span class="sl-lbl l">SOFT</span>
     <button class="state-btn"    onclick="animSlider('grp-sl',0)">Soft</button>
-    <input  type="range" id="grp-sl" min="0" max="100" value="100" oninput="renderAll()">
+    <input  type="range" id="grp-sl" min="0" max="100" value="100" oninput="cancelAnim('grp-sl');renderAll()">
     <button class="state-btn on" onclick="animSlider('grp-sl',100)">Erect</button>
     <span class="sl-lbl">ERECT</span>
   </div>
@@ -200,10 +200,11 @@ function renderPenis(canvas, imgs, lengthMm, girthMm) {
 }
 
 // ─── CHART BUILDER ───────────────────────────────────────────────────────────
+let _renderGen = 0;
 // entries: [{id, name, lenMm, girMm, type, isBrian}]
-// Returns the chart container HTML and schedules canvas renders.
-async function buildChart(containerId, entries) {
+async function buildChart(containerId, entries, gen) {
   const imgs    = await getPenisImages();
+  if (gen !== _renderGen) return;
   const COL_W   = 108;
   const RULER_W = 52;
   const PAD_T   = 18;
@@ -281,7 +282,7 @@ async function buildChart(containerId, entries) {
 }
 
 // ─── GROUP COMPARISON ────────────────────────────────────────────────────────
-async function renderGroup() {
+async function renderGroup(gen) {
   const t = sliderT('grp-sl');
   const sorted = [...PEOPLE].sort((a,b)=>a.le-b.le);
   const entries = sorted.map(p=>({
@@ -292,8 +293,8 @@ async function renderGroup() {
     type:   p.type,
     isBrian: p.id==='brian'
   }));
-  await buildChart('grp-chart', entries);
-  renderGroupStats(t);
+  await buildChart('grp-chart', entries, gen);
+  if (gen === _renderGen) renderGroupStats(t);
 }
 
 function renderGroupStats(t) {
@@ -314,16 +315,14 @@ function renderGroupStats(t) {
 }
 
 // ─── DEVELOPMENTAL CHART ─────────────────────────────────────────────────────
-async function renderDev() {
+async function renderDev(gen) {
   const t = sliderT('dev-sl');
   const brian = PEOPLE.find(p=>p.id==='brian');
   const bL = lerp(brian.ls, brian.le, t);
   const bG = lerp(brian.gs, brian.ge, t);
 
-  // Build dev entries: each age P50, plus Brian
   const devEntries = DEV.map(d => {
     const erL = d.p50, erG = d.p50 * d.gs_ratio;
-    // Soft estimate: soft/erect ≈ 0.57 for length, 0.63 for girth
     const sfL = d.p50 * 0.57, sfG = d.p50 * d.gs_ratio * 0.63;
     return {
       id:    'age_'+d.age,
@@ -335,14 +334,12 @@ async function renderDev() {
     };
   });
 
-  // Add Brian — insert sorted by erect length
   const brianEntry = {
     id:'brian', name:'Brian', lenMm:bL*IN2MM, girMm:bG*IN2MM, type:'subject', isBrian:true
   };
-  // Sort all by lenMm
   const all = [...devEntries, brianEntry].sort((a,b)=>a.lenMm-b.lenMm);
-  await buildChart('dev-chart', all);
-  renderDevStats(t);
+  await buildChart('dev-chart', all, gen);
+  if (gen === _renderGen) renderDevStats(t);
 }
 
 function renderDevStats(t) {
@@ -368,9 +365,12 @@ function renderDevStats(t) {
 
 // ─── CONTROLS ────────────────────────────────────────────────────────────────
 const _animFrames = {};
+function cancelAnim(id) {
+  if (_animFrames[id]) { cancelAnimationFrame(_animFrames[id]); _animFrames[id] = null; }
+}
 function animSlider(id, target) {
   const el = document.getElementById(id); if(!el)return;
-  if(_animFrames[id]) cancelAnimationFrame(_animFrames[id]);
+  cancelAnim(id);
   const start=+el.value, diff=target-start, t0=performance.now(), dur=550;
   (function step(now){
     const p=Math.min((now-t0)/dur,1), e=1-Math.pow(1-p,3);
@@ -388,8 +388,9 @@ function switchTab(name) {
 }
 
 function renderAll() {
-  renderGroup();
-  renderDev();
+  const gen = ++_renderGen;
+  renderGroup(gen);
+  renderDev(gen);
 }
 
 // Init on load
